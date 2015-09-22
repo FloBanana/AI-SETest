@@ -1,0 +1,131 @@
+buildscript {
+    ext {
+        springBootVersion = '1.2.2.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath 'com.bmuschko:gradle-docker-plugin:2.6'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+// imports for DockerTasks
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+
+jar {
+    baseName = 'monitor-dashboard'
+    version = '0.0.1-SNAPSHOT'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+group = 'hawai'
+mainClassName = 'se.callista.microservises.support.monitordashboard.HystrixDashboardApplication'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile("org.springframework.boot:spring-boot-starter-web") {
+        exclude module: 'spring-boot-starter-tomcat'
+    }
+    compile("org.springframework.boot:spring-boot-starter-undertow")
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+    compile('org.springframework.cloud:spring-cloud-starter-hystrix-dashboard:1.0.0.RELEASE')
+
+    testCompile 'org.mockito:mockito-all:2.0.2-beta'
+    testCompile 'org.assertj:assertj-core:3.1.0'
+    testCompile 'org.testng:testng:6.9.6'
+    testCompile 'com.jayway.restassured:rest-assured:2.5.0'
+}
+
+
+/**
+ * Setup docker task
+ */
+docker {
+    /* set this to you desired docker daemon. In case of local docker via docker-toolbox
+     * find out the ip of your docker-machine via 'docker-machine url default'
+     * Keep the https:// !
+     */
+    url = 'https://192.168.99.100:2376'
+    // set path to the certificate directory on your machine
+    certPath = new File(System.properties['user.home'],'/.docker/machine/machines/default')
+}
+
+/**
+ * Setup TestNG
+ */
+
+test {
+    // enable TestNG support (default is JUnit)
+    useTestNG()
+}
+
+/**
+ * Define tasks
+ */
+
+
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.7'
+}
+
+/**
+ * This task copies the tar file created by the distTar task from
+ * the distributions folder to the docker folder. The distTar task
+ * in return is called from the build task, which is a dependency
+ * of this task.
+ */
+task copyDist(type: Copy, dependsOn: [build, wrapper]) {
+    from('build/distributions/' + jar.baseName + '.tar')
+    into('build/docker')
+}
+
+
+/**
+ * This task creates the Dockerfile needed to create the Docker image.
+ * It inherits the java:8 docker image, sets some Spring Docker Profile variable,
+ * exposes port 8080 to the outer world and adds our tar file as content at the
+ * root path of the image.
+ */
+task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
+    destFile = project.file('build/docker/Dockerfile')
+    from 'java:8'
+    maintainer 'Christian Hüning "christian.huening@haw-hamburg.de"'
+    environmentVariable('JAVA_OPTS', '-Dspring.profiles.active=docker')
+    exposePort(7979)
+    entryPoint("/monitor-dashboard/bin/monitor-dashboard")
+    addFile({
+        jar.baseName + '.tar'
+    }, {
+        '/'
+    })
+}
+
+task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
+    inputDir = createDockerfile.destFile.parentFile
+    tag = 'monitor-dashboard'
+}
+
+/**
+ * Will be run on the CI Server (bamboo)
+ */
+task buildAll(dependsOn: [buildImage]) {
+
+}
+
+
+

@@ -1,0 +1,52 @@
+/**
+ * This file includes all necessary gradle projects from other folders to build the composite service
+ * More specifically the core services are added as well as the util services and supporting netflix OSS services
+ * Since the folder structure is not strictly hierarchical, we have to provide a path to the other project's folders.
+ * This is due to Gradle's convention over configuration approach. Usually the sub-projects are supposed to be in
+ * subfolders of the root projects' folder.
+ */
+
+/*
+Include Composition Services
+*/
+include ":product-composite-service"
+project(":product-composite-service").projectDir = file("../../composite/product-composite-service")
+
+/*
+Include Core Services
+ */
+
+include ":product-service"
+project(":product-service").projectDir = file("../../core/product-service")
+
+include ":recommendation-service"
+project(":recommendation-service").projectDir = file("../../core/recommendation-service")
+
+include ":review-service"
+project(":review-service").projectDir = file("../../core/review-service")
+
+/*
+Include supporting services
+ */
+
+include ":auth-server"
+project(":auth-server").projectDir = file("../../support/auth-server")
+
+include ":discovery-server"
+project(":discovery-server").projectDir = file("../../support/discovery-server")
+
+include ":edge-server"
+project(":edge-server").projectDir = file("../../support/edge-server")
+
+include ":monitor-dashboard"
+project(":monitor-dashboard").projectDir = file("../../support/monitor-dashboard")
+
+include ":turbine"
+project(":turbine").projectDir = file("../../support/turbine")
+
+/*
+Include utils
+ */
+
+include ":util"
+project(":util").projectDir = file("../../../util")

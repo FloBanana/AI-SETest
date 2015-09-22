@@ -1,0 +1,6 @@
+/*
+Include utils
+ */
+
+include ":util"
+project(":util").projectDir = file("../../../util")

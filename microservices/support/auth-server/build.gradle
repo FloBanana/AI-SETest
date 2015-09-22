@@ -1,0 +1,121 @@
+buildscript {
+    ext {
+        springBootVersion = '1.2.2.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath 'com.bmuschko:gradle-docker-plugin:2.6'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+// imports for DockerTasks
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+
+jar {
+    baseName = 'auth-server'
+    version = '0.0.1-SNAPSHOT'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+group = 'callista'
+mainClassName = 'demo.AuthserverApplication'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile('org.springframework.boot:spring-boot-starter-web') {
+        exclude module: 'spring-boot-starter-tomcat'
+    }
+    compile("org.springframework.boot:spring-boot-starter-undertow")
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+    compile("org.springframework.boot:spring-boot-starter-security")
+
+    compile("org.springframework.security.oauth:spring-security-oauth2:2.0.6.RELEASE")
+
+    testCompile('org.apache.httpcomponents:httpclient:4.3.6') {
+        exclude(module: 'commons-logging')
+    }
+
+    testCompile 'org.mockito:mockito-all:2.0.2-beta'
+    testCompile 'org.assertj:assertj-core:3.1.0'
+    testCompile 'org.testng:testng:6.9.6'
+    testCompile 'com.jayway.restassured:rest-assured:2.5.0'
+}
+
+/**
+ * Setup docker task
+ */
+docker {
+    /* set this to you desired docker daemon. In case of local docker via docker-toolbox
+     * find out the ip of your docker-machine via 'docker-machine url default'
+     * Keep the https:// !
+     */
+    url = 'https://192.168.99.100:2376'
+    // set path to the certificate directory on your machine
+    certPath = new File(System.properties['user.home'],'/.docker/machine/machines/default')
+}
+
+/**
+ * Setup TestNG
+ */
+
+test {
+    // enable TestNG support (default is JUnit)
+    useTestNG()
+}
+
+/**
+ * Define tasks
+ */
+
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.7'
+}
+
+
+task copyDist(type: Copy, dependsOn: [build, wrapper]) {
+    from('build/distributions/' + jar.baseName + '.tar')
+    into('build/docker')
+}
+
+
+task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
+    destFile = project.file('build/docker/Dockerfile')
+    from 'java:8'
+    maintainer 'Christian Hüning "christian.huening@haw-hamburg.de"'
+    environmentVariable('JAVA_OPTS', '-Dspring.profiles.active=docker')
+    exposePort(9999)
+    entryPoint("/auth-server/bin/auth-server")
+    addFile({
+        jar.baseName + '.tar'
+    }, {
+        '/'
+    })
+}
+
+task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
+    inputDir = createDockerfile.destFile.parentFile
+    tag = 'auth-server'
+}
+
+/**
+ * Will be run on the CI Server (bamboo)
+ */
+task buildAll(dependsOn: [buildImage]) {
+
+}

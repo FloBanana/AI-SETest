@@ -1,0 +1,27 @@
+/**
+ * This file includes all necessary gradle projects from other folders to build the composite service
+ * More specifically the core services are added as well as the util services and supporting netflix OSS services
+ * Since the folder structure is not strictly hierarchical, we have to provide a path to the other project's folders.
+ * This is due to Gradle's convention over configuration approach. Usually the sub-projects are supposed to be in
+ * subfolders of the root projects' folder.
+ */
+
+/*
+Include Core Services
+ */
+
+include ":product-service"
+project(":product-service").projectDir = file("../../core/product-service")
+
+include ":recommendation-service"
+project(":recommendation-service").projectDir = file("../../core/recommendation-service")
+
+include ":review-service"
+project(":review-service").projectDir = file("../../core/review-service")
+
+/*
+Include utils
+ */
+
+include ":util"
+project(":util").projectDir = file("../../../util")

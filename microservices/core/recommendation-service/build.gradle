@@ -1,0 +1,141 @@
+buildscript {
+    ext {
+        springBootVersion = '1.2.2.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath 'com.bmuschko:gradle-docker-plugin:2.6'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+// imports for DockerTasks
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+
+jar {
+    baseName = 'recommendation-service'
+    version = '0.0.1-SNAPSHOT'
+}
+
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+group = 'hawai'
+mainClassName = 'se.callista.microservises.core.recommendation.RecommendationServiceApplication'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        // Can't find spring-cloud-build in maven central...
+        url 'http://maven.springframework.org/release'
+    }
+}
+
+dependencies {
+    // TODO: Added ver no on the three core starter deps to make the maven plugin to work
+    compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}") {
+        exclude module: 'spring-boot-starter-tomcat'
+    }
+    compile("org.springframework.boot:spring-boot-starter-undertow:${springBootVersion}")
+    compile("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
+    compile("org.springframework.cloud:spring-cloud-starter-hystrix:1.0.0.RELEASE")
+    compile("org.springframework.cloud:spring-cloud-starter-eureka:1.0.0.RELEASE")
+
+    compile project(":util")
+
+    testCompile 'org.mockito:mockito-all:2.0.2-beta'
+    testCompile 'org.assertj:assertj-core:3.1.0'
+    testCompile 'org.testng:testng:6.9.6'
+    testCompile 'com.jayway.restassured:rest-assured:2.5.0'
+}
+
+
+
+/**
+ * Setup docker task
+ */
+docker {
+    /* set this to you desired docker daemon. In case of local docker via docker-toolbox
+     * find out the ip of your docker-machine via 'docker-machine url default'
+     * Keep the https:// !
+     */
+    url = 'https://192.168.99.100:2376'
+    // set path to the certificate directory on your machine
+    certPath = new File(System.properties['user.home'],'/.docker/machine/machines/default')
+}
+
+/**
+ * Setup TestNG
+ */
+
+test {
+    // enable TestNG support (default is JUnit)
+    useTestNG()
+}
+
+/**
+ * Define tasks
+ */
+
+
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.7'
+}
+
+
+
+/**
+ * This task copies the tar file created by the distTar task from
+ * the distributions folder to the docker folder. The distTar task
+ * in return is called from the build task, which is a dependency
+ * of this task.
+ */
+task copyDist(type: Copy, dependsOn: [build, wrapper]) {
+    from('build/distributions/' + jar.baseName + '.tar')
+    into('build/docker')
+}
+
+
+/**
+ * This task creates the Dockerfile needed to create the Docker image.
+ * It inherits the java:8 docker image, sets some Spring Docker Profile variable,
+ * exposes port 8080 to the outer world and adds our tar file as content at the
+ * root path of the image.
+ */
+task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
+    destFile = project.file('build/docker/Dockerfile')
+    from 'java:8'
+    maintainer 'Christian Hüning "christian.huening@haw-hamburg.de"'
+    environmentVariable('JAVA_OPTS', '-Dspring.profiles.active=docker')
+    exposePort(8080)
+    entryPoint("/recommendation-service/bin/recommendation-service")
+    addFile({
+        jar.baseName + '.tar'
+    }, {
+        '/'
+    })
+}
+
+task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
+    inputDir = createDockerfile.destFile.parentFile
+    tag = 'recommendation-service'
+}
+
+/**
+ * Will be run on the CI Server (bamboo)
+ */
+task buildAll(dependsOn: [buildImage]) {
+
+}

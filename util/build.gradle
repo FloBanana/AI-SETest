@@ -1,0 +1,49 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+jar {
+    baseName = 'util'
+    version = '0.0.1-SNAPSHOT'
+}
+
+
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile("org.springframework.boot:spring-boot-starter-web:1.2.2.RELEASE")
+    compile("org.springframework.cloud:spring-cloud-starter-hystrix:1.0.0.RELEASE")
+
+    // TODO: Should be changed to provided to minimize class load conflicts over time???
+    compile("org.springframework.security:spring-security-core:3.2.6.RELEASE")
+
+    compile("net.logstash.logback:logstash-logback-encoder:4.3")
+
+    testCompile 'org.mockito:mockito-all:2.0.2-beta'
+    testCompile 'org.assertj:assertj-core:3.1.0'
+    testCompile 'org.testng:testng:6.9.6'
+    testCompile 'com.jayway.restassured:rest-assured:2.5.0'
+}
+
+
+/**
+ * Define tasks
+ */
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.7'
+}
+/**
+ * Will be run on the CI Server (bamboo)
+ */
+task buildAll(dependsOn: [build]) {
+
+}
+
+

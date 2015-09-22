@@ -1,0 +1,59 @@
+rabbitmq:
+  image: rabbitmq:3-management
+  ports:
+    - "5672:5672"
+    - "15672:15672"
+
+discovery:
+  image: callista/discovery-server
+  ports:
+    - "8761:8761"
+
+auth:
+  image: callista/auth-server
+  ports:
+    - "9999:9999"
+  
+pro:
+  image: callista/product-service
+  links:
+    - discovery
+
+rec:
+  image: callista/recommendation-service
+  links:
+    - discovery
+
+rev:
+  image: callista/review-service
+  links:
+    - discovery
+
+composite:
+  image: callista/product-composite-service
+  links:
+    - discovery
+    - rabbitmq
+
+api:
+  image: callista/product-api-service
+  links:
+    - auth
+    - discovery
+    - rabbitmq
+
+monitor:
+  image: callista/monitor-dashboard
+  ports:
+    - "7979:7979"
+  links:
+    - api
+    - composite
+
+edge:
+  image: callista/edge-server
+  ports:
+    - "443:8765"
+  links:
+    - discovery
+    - api

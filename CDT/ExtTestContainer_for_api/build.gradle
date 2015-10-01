@@ -1,0 +1,244 @@
+/**
+ * This is main build script for the whole example application.
+ * To execute the whole build pipeline run 'gradlew buildAll'
+ * from a command line in the directory this file is located in.
+ * Hint: Make sure your Docker Daemon is running and listening
+ * on the configured IP:PORT (default: 192.168.99.100:2376, can be
+ * checked with 'docker-machine url default').
+ *
+ * File created and maintained by:
+ * Christian Hüning - christian.huening@haw-hamburg.de
+ */
+
+
+/**
+ * Define general parameters, dependencies and repositories for the build script
+ */
+buildscript {
+    ext {
+        springBootVersion = '1.2.2.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath 'com.bmuschko:gradle-docker-plugin:2.6'
+    }
+}
+
+/**
+ * Load several plugins, consult the gradle documentation for more info
+ */
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+// imports for DockerTasks
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
+import com.bmuschko.gradle.docker.tasks.container.DockerCreateContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerStartContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerStopContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerRemoveContainer
+
+
+
+/**
+ * Define the name and version of the resulting jar file
+ */
+jar {
+    baseName = 'product-api-service'
+    version = '0.0.1-SNAPSHOT'
+}
+
+
+/**
+ * Define source and target java version compatibility
+ */
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+group = 'hawai'
+mainClassName = 'de.haw.hamburg.hawai.cdt.ProductApiServiceApplication'
+
+/**
+ * Setup library repositories
+ */
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        // Can't find spring-cloud-build in maven central...
+        url 'http://maven.springframework.org/release'
+    }
+}
+
+sourceSets {
+    serviceTest {
+        java.srcDir file('src/serviceTest/java')
+        resources.srcDir file('src/serviceTest/resources')
+        compileClasspath = sourceSets.main.output + configurations.testRuntime
+        runtimeClasspath = output + compileClasspath
+    }
+
+    /*consumerDrivenTest {
+        java.srcDir file('src/consumerDrivenTest/java')
+        resources.srcDir file('src/consumerDrivenTest/resources')
+        compileClasspath = sourceSets.main.output + configurations.testRuntime
+        runtimeClasspath = output + compileClasspath
+    }*/
+}
+
+
+dependencies {
+    compile("org.springframework.boot:spring-boot-starter-web") {
+        exclude module: 'spring-boot-starter-tomcat'
+    }
+
+    compile("org.springframework.boot:spring-boot-starter-undertow")
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+    compile("org.springframework.cloud:spring-cloud-starter-hystrix:1.0.0.RELEASE")
+    compile("org.springframework.cloud:spring-cloud-starter-eureka:1.0.0.RELEASE")
+    compile("org.springframework.cloud:spring-cloud-starter-bus-amqp:1.0.0.RELEASE")
+    compile("org.springframework.cloud:spring-cloud-netflix-hystrix-amqp:1.0.0.RELEASE")
+
+    compile("org.springframework.cloud:spring-cloud-starter-security:1.0.0.RELEASE")
+    compile("org.springframework.security.oauth:spring-security-oauth2:2.0.6.RELEASE")
+
+    compile("org.apache.httpcomponents:httpclient:4.2.1")
+    compile("org.apache.httpcomponents:fluent-hc:4.2.1")
+
+
+    //testCompile("org.springframework.boot:spring-boot-starter-test")
+    compile 'org.mockito:mockito-all:2.0.2-beta'
+    compile 'org.assertj:assertj-core:3.1.0'
+    compile 'org.testng:testng:6.9.6'
+    compile 'com.jayway.restassured:rest-assured:2.5.0'
+}
+
+
+
+
+/**
+ * Setup docker task
+ */
+docker {
+    /* TODO !IMPORTANT!
+     * set this to you desired docker daemon. In case of local docker via docker-toolbox
+     * find out the ip of your docker-machine via 'docker-machine url default'
+     * TODO: Keep the https:// !
+     */
+    url = 'https://192.168.99.100:2376'
+    // set path to the certificate directory on your machine
+    certPath = new File(System.properties['user.home'],'/.docker/machine/machines/default')
+
+    registryCredentials {
+        url = 'https://artifactory.mars.haw-hamburg.de:5002'
+        username = '<DeineHAWKennung>'
+        password = '<DeinHAWPasswort>'
+        email = '<DeineHAWMailAdresse>'
+    }
+
+}
+
+/**
+ * Setup Tests
+ */
+
+test {
+    // enable TestNG support (default is JUnit)
+    useTestNG()
+
+    reports.html.destination = file("$reports.html.destination/unit")
+    reports.junitXml.destination = file("$reports.junitXml.destination/unit")
+}
+
+
+
+
+
+/**
+ * Define tasks
+ */
+
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.7'
+}
+
+/**
+ * This task copies the tar file created by the distTar task from
+ * the distributions folder to the docker folder. The distTar task
+ * in return is called from the build task, which is a dependency
+ * of this task.
+ */
+task copyDist(type: Copy, dependsOn: [build, wrapper]) {
+    from('build/distributions/' + jar.baseName + '.tar')
+    into('build/docker/')
+    from('build/resources/main/truststore.jks')
+    into('build/docker/')
+}
+
+
+/**
+ * This task creates the Dockerfile needed to create the Docker image.
+ * It inherits the java:8 docker image, sets some Spring Docker Profile variable,
+ * exposes port 8080 to the outer world and adds our tar file as content at the
+ * root path of the image.
+ */
+task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
+    destFile = project.file('build/docker/Dockerfile')
+    from 'java:8'
+    maintainer 'Christian Hüning "christian.huening@haw-hamburg.de"'
+    environmentVariable('JAVA_OPTS', '-Dspring.profiles.active=docker -Djavax.net.ssl.trustStore=truststore.jks -Djavax.net.ssl.trustStorePassword=password')
+    exposePort(8080)
+    entryPoint("/product-api-service/bin/product-api-service")
+    // copy truststore file into container. It's needed by OAuth
+    addFile({
+        'truststore.jks'
+    }, {
+        'truststore.jks'
+    })
+    // Copy contents from the build output's .tar file into container
+    // the ADD command in docker takes a .tar file and extracts it into
+    // the given folder in the container. In this case '/'
+    addFile({
+        jar.baseName + '.tar'
+    }, {
+        '/'
+    })
+
+}
+
+/**
+ * This task builds the actual image of this service by using the previously
+ * created Dockerfile from the ./build/docker folder and applying a talking tag
+ * to the image
+ */
+task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
+    inputDir = createDockerfile.destFile.parentFile
+    tag = 'product-api-service'
+}
+
+
+/**
+ * Start this task to kick off the build.
+ * It'll build this project and all sup-projects, as well as
+ * run the local Unit Tests and create Docker images for each
+ * project, if all was well.
+ */
+task buildAll(dependsOn: [buildImage]){
+
+}
+
+
+tasks.withType(Test) {
+    testLogging {
+        showStandardStreams = true
+        exceptionFormat 'full'
+    }
+}

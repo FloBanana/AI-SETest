@@ -34,17 +34,12 @@ buildscript {
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
-apply plugin: 'spring-boot'
 apply plugin: 'com.bmuschko.docker-remote-api'
 
 // imports for DockerTasks
 import com.bmuschko.gradle.docker.tasks.image.Dockerfile
 import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
-import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
-import com.bmuschko.gradle.docker.tasks.container.DockerCreateContainer
-import com.bmuschko.gradle.docker.tasks.container.DockerStartContainer
-import com.bmuschko.gradle.docker.tasks.container.DockerStopContainer
-import com.bmuschko.gradle.docker.tasks.container.DockerRemoveContainer
+import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
 
 
 
@@ -52,7 +47,7 @@ import com.bmuschko.gradle.docker.tasks.container.DockerRemoveContainer
  * Define the name and version of the resulting jar file
  */
 jar {
-    baseName = 'product-api-service'
+    baseName = 'ExtTestContainer_for_api'
     version = '0.0.1-SNAPSHOT'
 }
 
@@ -63,7 +58,7 @@ jar {
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 group = 'hawai'
-mainClassName = 'de.haw.hamburg.hawai.cdt.ProductApiServiceApplication'
+//mainClassName = 'de.haw.hamburg.hawai.cdt.ProductApiServiceApplication'
 
 /**
  * Setup library repositories
@@ -78,46 +73,21 @@ repositories {
 }
 
 sourceSets {
-    serviceTest {
-        java.srcDir file('src/serviceTest/java')
-        resources.srcDir file('src/serviceTest/resources')
-        compileClasspath = sourceSets.main.output + configurations.testRuntime
-        runtimeClasspath = output + compileClasspath
-    }
-
-    /*consumerDrivenTest {
+    consumerDrivenTest {
         java.srcDir file('src/consumerDrivenTest/java')
         resources.srcDir file('src/consumerDrivenTest/resources')
         compileClasspath = sourceSets.main.output + configurations.testRuntime
         runtimeClasspath = output + compileClasspath
-    }*/
+    }
 }
 
 
 dependencies {
-    compile("org.springframework.boot:spring-boot-starter-web") {
-        exclude module: 'spring-boot-starter-tomcat'
-    }
-
-    compile("org.springframework.boot:spring-boot-starter-undertow")
-    compile("org.springframework.boot:spring-boot-starter-actuator")
-    compile("org.springframework.cloud:spring-cloud-starter-hystrix:1.0.0.RELEASE")
-    compile("org.springframework.cloud:spring-cloud-starter-eureka:1.0.0.RELEASE")
-    compile("org.springframework.cloud:spring-cloud-starter-bus-amqp:1.0.0.RELEASE")
-    compile("org.springframework.cloud:spring-cloud-netflix-hystrix-amqp:1.0.0.RELEASE")
-
-    compile("org.springframework.cloud:spring-cloud-starter-security:1.0.0.RELEASE")
-    compile("org.springframework.security.oauth:spring-security-oauth2:2.0.6.RELEASE")
-
-    compile("org.apache.httpcomponents:httpclient:4.2.1")
-    compile("org.apache.httpcomponents:fluent-hc:4.2.1")
-
-
     //testCompile("org.springframework.boot:spring-boot-starter-test")
-    compile 'org.mockito:mockito-all:2.0.2-beta'
-    compile 'org.assertj:assertj-core:3.1.0'
-    compile 'org.testng:testng:6.9.6'
-    compile 'com.jayway.restassured:rest-assured:2.5.0'
+    testCompile 'org.mockito:mockito-all:2.0.2-beta'
+    testCompile 'org.assertj:assertj-core:3.1.0'
+    testCompile 'org.testng:testng:6.9.6'
+    testCompile 'com.jayway.restassured:rest-assured:2.5.0'
 }
 
 
@@ -138,9 +108,6 @@ docker {
 
     registryCredentials {
         url = 'https://artifactory.mars.haw-hamburg.de:5002'
-        username = '<DeineHAWKennung>'
-        password = '<DeinHAWPasswort>'
-        email = '<DeineHAWMailAdresse>'
     }
 
 }
@@ -214,6 +181,16 @@ task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
 
 }
 
+task cdTest(type: Test, dependsOn: [createDockerfile]) {
+    useTestNG()
+    testClassesDir = sourceSets.consumerDrivenTest.output.classesDir
+    classpath = sourceSets.consumerDrivenTest.runtimeClasspath
+
+    reports.html.destination = file("$reports.html.destination/cdt")
+    reports.junitXml.destination = file("$reports.junitXml.destination/cdt")
+}
+
+
 /**
  * This task builds the actual image of this service by using the previously
  * created Dockerfile from the ./build/docker folder and applying a talking tag
@@ -221,9 +198,16 @@ task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
  */
 task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
     inputDir = createDockerfile.destFile.parentFile
-    tag = 'product-api-service'
+    tag = 'artifactory.mars.haw-hamburg.de:5002/exttestcontainer_for_api'
 }
 
+/**
+ * Pushes the container image to the MARS Artifactory repository
+ */
+task pushImage(type: DockerPushImage, dependsOn: [buildImage]){
+    imageName = buildImage.tag
+    tag = "latest"
+}
 
 /**
  * Start this task to kick off the build.
@@ -231,7 +215,7 @@ task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
  * run the local Unit Tests and create Docker images for each
  * project, if all was well.
  */
-task buildAll(dependsOn: [buildImage]){
+task buildAll(dependsOn: [pushImage]){
 
 }
 

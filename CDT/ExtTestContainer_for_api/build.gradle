@@ -72,22 +72,17 @@ repositories {
     }
 }
 
-sourceSets {
-    consumerDrivenTest {
-        java.srcDir file('src/consumerDrivenTest/java')
-        resources.srcDir file('src/consumerDrivenTest/resources')
-        compileClasspath = sourceSets.main.output + configurations.testRuntime
-        runtimeClasspath = output + compileClasspath
-    }
-}
-
 
 dependencies {
-    //testCompile("org.springframework.boot:spring-boot-starter-test")
     testCompile 'org.mockito:mockito-all:2.0.2-beta'
     testCompile 'org.assertj:assertj-core:3.1.0'
     testCompile 'org.testng:testng:6.9.6'
     testCompile 'com.jayway.restassured:rest-assured:2.5.0'
+
+    testRuntime 'org.mockito:mockito-all:2.0.2-beta'
+    testRuntime 'org.assertj:assertj-core:3.1.0'
+    testRuntime 'org.testng:testng:6.9.6'
+    testRuntime 'com.jayway.restassured:rest-assured:2.5.0'
 }
 
 
@@ -118,10 +113,7 @@ docker {
 
 test {
     // enable TestNG support (default is JUnit)
-    useTestNG()
-
-    reports.html.destination = file("$reports.html.destination/unit")
-    reports.junitXml.destination = file("$reports.junitXml.destination/unit")
+    //useTestNG()
 }
 
 
@@ -181,14 +173,7 @@ task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
 
 }
 
-task cdTest(type: Test, dependsOn: [createDockerfile]) {
-    useTestNG()
-    testClassesDir = sourceSets.consumerDrivenTest.output.classesDir
-    classpath = sourceSets.consumerDrivenTest.runtimeClasspath
 
-    reports.html.destination = file("$reports.html.destination/cdt")
-    reports.junitXml.destination = file("$reports.junitXml.destination/cdt")
-}
 
 
 /**

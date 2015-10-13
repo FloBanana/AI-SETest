@@ -527,8 +527,9 @@ task createContainerForCDT(type: DockerCreateContainer, dependsOn: [serviceTest]
 
 
 /**
- * This task executes all Consumer Driven Tests after all ServiceTests have been successfull. The supporting Netflix services
- * are required to start our own services, so it is made sure these are available and properly started.
+ * This task executes all Consumer Driven Tests after all ServiceTests have been successfull.
+ * The supporting Netflix services are required to start our own services, so it is made sure
+ * these are available and properly started.
  */
 task startContainerForCDT(type: DockerStartContainer, dependsOn: [createContainerForCDT]) {
     targetContainerId{ createContainerForCDT.getContainerId()}

@@ -1,0 +1,126 @@
+/**
+ * 
+ * Hint: Make sure your Docker Daemon is running and listening
+ * on the configured IP:PORT (default: 192.168.99.100:2376, can be
+ * checked with 'docker-machine url default').
+ *
+ * File created and maintained by:
+ * Christian Hüning - christian.huening@haw-hamburg.de
+ */
+
+
+/**
+ * Define general parameters, dependencies and repositories for the build script
+ */
+buildscript {
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.bmuschko:gradle-docker-plugin:2.6'
+    }
+}
+
+/**
+ * Setup library repositories
+ */
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+
+/**
+ * Load several plugins, consult the gradle documentation for more info
+ */
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+// imports for DockerTasks
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
+
+
+/**
+ * Setup docker task
+ */
+docker {
+    /* TODO !IMPORTANT!
+     * set this to you desired docker daemon. In case of local docker via docker-toolbox
+     * find out the ip of your docker-machine via 'docker-machine url default'
+     * TODO: Keep the https:// !
+     */
+    url = 'https://192.168.99.100:2376'
+    // set path to the certificate directory on your machine
+    certPath = new File(System.properties['user.home'],'/.docker/machine/machines/default')
+
+    registryCredentials {
+        url = 'https://artifactory.mars.haw-hamburg.de:5002'
+    }
+
+}
+
+
+/**
+ * Define tasks
+ */
+
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.7'
+}
+
+
+/**
+ * This task creates the Dockerfile needed to create the Docker image.
+ * It inherits the java:8 docker image, sets some Spring Docker Profile variable,
+ * exposes port 8080 to the outer world and adds our tar file as content at the
+ * root path of the image.
+ */
+task createDockerfile(type: Dockerfile) {
+    destFile = project.file('Dockerfile')
+    from 'java:8'
+    maintainer 'Christian Hüning "christian.huening@haw-hamburg.de"'
+    // copy all contents from CDT Testproject
+    addFile({
+        'ExtTestContainer_for_api'
+    }, {
+        '/'
+    })
+    // set executable to gradlew
+    entryPoint('./gradlew')
+    // set default task param to 'test' (may be overidden by caller)
+    defaultCommand('test')
+}
+
+
+
+
+/**
+ * This task builds the actual image of this service by using the previously
+ * created Dockerfile from the ./build/docker folder and applying a talking tag
+ * to the image
+ */
+task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
+    inputDir = createDockerfile.destFile.parentFile
+    tag = 'artifactory.mars.haw-hamburg.de:5002/exttestcontainer_for_api'
+}
+
+/**
+ * Pushes the container image to the MARS Artifactory repository
+ */
+task pushImage(type: DockerPushImage, dependsOn: [buildImage]){
+    imageName = buildImage.tag
+    tag = "latest"
+}
+
+/**
+ * Start this task to kick off the build.
+ * It'll build this project and all sup-projects, as well as
+ * run the local Unit Tests and create Docker images for each
+ * project, if all was well.
+ */
+task buildAll(dependsOn: [buildImage]){
+
+}

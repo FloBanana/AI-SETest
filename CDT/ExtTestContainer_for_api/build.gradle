@@ -1,10 +1,5 @@
 /**
- * This is main build script for the whole example application.
- * To execute the whole build pipeline run 'gradlew buildAll'
- * from a command line in the directory this file is located in.
- * Hint: Make sure your Docker Daemon is running and listening
- * on the configured IP:PORT (default: 192.168.99.100:2376, can be
- * checked with 'docker-machine url default').
+ *
  *
  * File created and maintained by:
  * Christian Hüning - christian.huening@haw-hamburg.de
@@ -24,7 +19,6 @@ buildscript {
     }
     dependencies {
         classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
-        classpath 'com.bmuschko:gradle-docker-plugin:2.6'
     }
 }
 
@@ -32,16 +26,6 @@ buildscript {
  * Load several plugins, consult the gradle documentation for more info
  */
 apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'idea'
-apply plugin: 'com.bmuschko.docker-remote-api'
-
-// imports for DockerTasks
-import com.bmuschko.gradle.docker.tasks.image.Dockerfile
-import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
-import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
-
-
 
 /**
  * Define the name and version of the resulting jar file
@@ -86,27 +70,6 @@ dependencies {
 }
 
 
-
-
-/**
- * Setup docker task
- */
-docker {
-    /* TODO !IMPORTANT!
-     * set this to you desired docker daemon. In case of local docker via docker-toolbox
-     * find out the ip of your docker-machine via 'docker-machine url default'
-     * TODO: Keep the https:// !
-     */
-    url = 'https://192.168.99.100:2376'
-    // set path to the certificate directory on your machine
-    certPath = new File(System.properties['user.home'],'/.docker/machine/machines/default')
-
-    registryCredentials {
-        url = 'https://artifactory.mars.haw-hamburg.de:5002'
-    }
-
-}
-
 /**
  * Setup Tests
  */
@@ -128,7 +91,6 @@ test {
 task wrapper(type: Wrapper) {
     gradleVersion = '2.7'
 }
-
 
 
 

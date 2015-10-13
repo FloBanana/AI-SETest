@@ -121,6 +121,6 @@ task pushImage(type: DockerPushImage, dependsOn: [buildImage]){
  * run the local Unit Tests and create Docker images for each
  * project, if all was well.
  */
-task buildAll(dependsOn: [buildImage]){
+task buildAll(dependsOn: [pushImage]){
 
 }

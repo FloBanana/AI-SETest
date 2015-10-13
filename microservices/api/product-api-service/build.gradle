@@ -24,7 +24,7 @@ buildscript {
     }
     dependencies {
         classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
-        classpath 'com.bmuschko:gradle-docker-plugin:2.6'
+        classpath 'com.bmuschko:gradle-docker-plugin:2.6.1'
     }
 }
 
@@ -43,6 +43,7 @@ import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
 import com.bmuschko.gradle.docker.tasks.container.DockerCreateContainer
 import com.bmuschko.gradle.docker.tasks.container.DockerStartContainer
+import com.bmuschko.gradle.docker.tasks.container.DockerWaitContainer
 import com.bmuschko.gradle.docker.tasks.container.DockerStopContainer
 import com.bmuschko.gradle.docker.tasks.container.DockerRemoveContainer
 
@@ -517,18 +518,25 @@ task serviceTest(type: Test, dependsOn: [setupApplicationLandscape]) {
 
     reports.html.destination = file("$reports.html.destination/service")
     reports.junitXml.destination = file("$reports.junitXml.destination/service")
-    finalizedBy stopNetflixEdgeContainer
+}
+
+
+task createContainerForCDT(type: DockerCreateContainer, dependsOn: [serviceTest]){
+    imageId = 'artifactory.mars.haw-hamburg.de:5002/exttestcontainer_for_api'
 }
 
 
 /**
- * This task executes all Consumer Driven Tests. The supporting Netflix services
+ * This task executes all Consumer Driven Tests after all ServiceTests have been successfull. The supporting Netflix services
  * are required to start our own services, so it is made sure these are available and properly started.
  */
-task consumerDrivenTest(type: Test) {
-    include '**/*CDTests.class'
-    reports.html.destination = file("$reports.html.destination/cdt")
-    reports.junitXml.destination = file("$reports.junitXml.destination/cdt")
+task startContainerForCDT(type: DockerStartContainer, dependsOn: [createContainerForCDT]) {
+    targetContainerId{ createContainerForCDT.getContainerId()}
+}
+
+task consumerDrivenTest(type: DockerWaitContainer, dependsOn: [startContainerForCDT]){
+    targetContainerId{ createContainerForCDT.getContainerId()}
+    finalizedBy stopNetflixEdgeContainer
 }
 
 /**

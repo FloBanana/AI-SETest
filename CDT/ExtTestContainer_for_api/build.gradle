@@ -113,7 +113,7 @@ docker {
 
 test {
     // enable TestNG support (default is JUnit)
-    //useTestNG()
+    useTestNG()
 }
 
 
@@ -129,80 +129,7 @@ task wrapper(type: Wrapper) {
     gradleVersion = '2.7'
 }
 
-/**
- * This task copies the tar file created by the distTar task from
- * the distributions folder to the docker folder. The distTar task
- * in return is called from the build task, which is a dependency
- * of this task.
- */
-task copyDist(type: Copy, dependsOn: [build, wrapper]) {
-    from('build/distributions/' + jar.baseName + '.tar')
-    into('build/docker/')
-    from('build/resources/main/truststore.jks')
-    into('build/docker/')
-}
 
-
-/**
- * This task creates the Dockerfile needed to create the Docker image.
- * It inherits the java:8 docker image, sets some Spring Docker Profile variable,
- * exposes port 8080 to the outer world and adds our tar file as content at the
- * root path of the image.
- */
-task createDockerfile(type: Dockerfile, dependsOn: [copyDist]) {
-    destFile = project.file('build/docker/Dockerfile')
-    from 'java:8'
-    maintainer 'Christian Hüning "christian.huening@haw-hamburg.de"'
-    environmentVariable('JAVA_OPTS', '-Dspring.profiles.active=docker -Djavax.net.ssl.trustStore=truststore.jks -Djavax.net.ssl.trustStorePassword=password')
-    exposePort(8080)
-    entryPoint("/product-api-service/bin/product-api-service")
-    // copy truststore file into container. It's needed by OAuth
-    addFile({
-        'truststore.jks'
-    }, {
-        'truststore.jks'
-    })
-    // Copy contents from the build output's .tar file into container
-    // the ADD command in docker takes a .tar file and extracts it into
-    // the given folder in the container. In this case '/'
-    addFile({
-        jar.baseName + '.tar'
-    }, {
-        '/'
-    })
-
-}
-
-
-
-
-/**
- * This task builds the actual image of this service by using the previously
- * created Dockerfile from the ./build/docker folder and applying a talking tag
- * to the image
- */
-task buildImage(type: DockerBuildImage, dependsOn: [createDockerfile]) {
-    inputDir = createDockerfile.destFile.parentFile
-    tag = 'artifactory.mars.haw-hamburg.de:5002/exttestcontainer_for_api'
-}
-
-/**
- * Pushes the container image to the MARS Artifactory repository
- */
-task pushImage(type: DockerPushImage, dependsOn: [buildImage]){
-    imageName = buildImage.tag
-    tag = "latest"
-}
-
-/**
- * Start this task to kick off the build.
- * It'll build this project and all sup-projects, as well as
- * run the local Unit Tests and create Docker images for each
- * project, if all was well.
- */
-task buildAll(dependsOn: [pushImage]){
-
-}
 
 
 tasks.withType(Test) {

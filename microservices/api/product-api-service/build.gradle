@@ -518,6 +518,7 @@ task serviceTest(type: Test, dependsOn: [setupApplicationLandscape]) {
 
     reports.html.destination = file("$reports.html.destination/service")
     reports.junitXml.destination = file("$reports.junitXml.destination/service")
+    finalizedBy stopNetflixEdgeContainer
 }
 
 
@@ -537,7 +538,7 @@ task startContainerForCDT(type: DockerStartContainer, dependsOn: [createContaine
 
 task consumerDrivenTest(type: DockerWaitContainer, dependsOn: [startContainerForCDT]){
     targetContainerId{ createContainerForCDT.getContainerId()}
-    finalizedBy stopNetflixEdgeContainer
+    //finalizedBy stopNetflixEdgeContainer
 }
 
 /**
